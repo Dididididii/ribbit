@@ -10,4 +10,9 @@ export default {
 }
 </script>
 
-<style scoped lang='less'></style>
+<style scoped lang='less'>
+.xtx-home-page {
+  .hoverShadow();
+  color: @xtxColor;
+}
+</style>
