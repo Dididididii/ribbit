@@ -37,7 +37,8 @@
                   <div>
                     <p class="name ellipsis">{{item.name}}</p>
                     <!-- 选择规格组件 -->
-                    <p class="attr">{{item.attrsText}}</p>
+                    <CartSku @change="$event=>updateCartSku(item.skuId,$event)" :skuId="item.skuId"  :attrsText="item.attrsText" />
+                    <!-- <p class="attr">{{item.attrsText}}</p> -->
                   </div>
                 </div>
               </td>
@@ -49,7 +50,7 @@
                 </p>
               </td>
               <td class="tc">
-                <XtxNumbox :modelValue="item.count" />
+                <XtxNumbox :max="item.stock" @change="$event=>changeCount(item.skuId,$event)" :modelValue="item.count" />
               </td>
               <td class="tc"><p class="f16 red">&yen;{{item.nowPrice*100*item.count/100}}</p></td>
               <td class="tc">
@@ -90,14 +91,14 @@
       <div class="action">
         <div class="batch">
           <XtxCheckbox @change="checkAll" :modelValue="$store.getters['cart/isCheckAll']">全选</XtxCheckbox>
-          <a href="javascript:;">删除商品</a>
+          <a @click="batchDeleteCart(false)" href="javascript:;">删除商品</a>
           <a href="javascript:;">移入收藏夹</a>
-          <a href="javascript:;">清空失效商品</a>
+          <a href="javascript:;" @click="batchDeleteCart(true)">清空失效商品</a>
         </div>
         <div class="total">
           共 {{$store.getters['cart/validTotal']}} 件商品，已选择 {{$store.getters['cart/selectedTotal']}} 件，商品合计：
           <span class="red">¥{{$store.getters['cart/selectedAmount']}}</span>
-          <XtxButton type="primary">下单结算</XtxButton>
+          <XtxButton @click="goCheckout()" type="primary">下单结算</XtxButton>
         </div>
       </div>
       <!-- 猜你喜欢 -->
@@ -111,10 +112,12 @@ import { useStore } from 'vuex'
 import CartNone from './components/cart-none.vue'
 import Message from '@/components/library/Message'
 import Confirm from '@/components/library/confirm'
+import CartSku from './components/cart-sku.vue'
+import { useRouter } from 'vue-router'
 
 export default {
   name: 'XtxCartPage',
-  components: { GoodRelevant, CartNone },
+  components: { GoodRelevant, CartNone, CartSku },
   setup () {
     const store = useStore()
     // 单选
@@ -126,16 +129,46 @@ export default {
       store.dispatch('cart/checkAllCart', selected)
     }
     // 删除
-    const deleteCart = (item) => {
+    const deleteCart = (skuId) => {
       Confirm({ text: ' 您确认从购物车删除该商品吗？' }).then(() => {
         // console.log('点击确认')
-        store.dispatch('cart/deleteCart', item.skuId)
+        store.dispatch('cart/deleteCart', skuId)
         Message({ type: 'success', text: '删除成功' })
       }).catch(e => {
         // console.log('点击取消')
       })
     }
-    return { checkOne, checkAll, deleteCart }
+    // 批量删除
+    const batchDeleteCart = (isClear) => {
+      Confirm({ text: `您确定从购物车删除${isClear ? '失效' : '选中'}的商品吗？` }).then(() => {
+        store.dispatch('cart/batchDeleteCart', isClear)
+      }).catch(e => {})
+    }
+    // 修改数量
+    const changeCount = (skuId, count) => {
+      store.dispatch('cart/updateCart', { skuId, count })
+    }
+    // 修改规格
+    const updateCartSku = (oldSkuId, newSku) => {
+      store.dispatch('cart/updateCartSku', { oldSkuId, newSku })
+    }
+    // 跳转结算页面
+    const router = useRouter()
+    const goCheckout = () => {
+      // 1. 判断是否选择有效商品
+      // 2. 判断是否已经登录，未登录 弹窗提示
+      // 3. 进行跳转 （需要做访问权限控制）
+      if (store.getters['cart/selectedTotal'] === 0) return Message({ text: '至少选中一件商品才能结算' })
+      if (!store.state.user.profile.token) {
+        Confirm({ text: '下单结算需要登录，您是否去登录？' }).then(() => {
+          // 点击确认
+          router.push('/member/checkout')
+        }).catch(e => {})
+      } else {
+        router.push('/member/checkout')
+      }
+    }
+    return { checkOne, checkAll, deleteCart, batchDeleteCart, changeCount, updateCartSku, goCheckout }
   }
 }
 </script>
